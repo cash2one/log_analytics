@@ -94,7 +94,7 @@ def parse_self_log(line):
   return d['ip'], int(d['size']), int(float(d['request_time']) * 1000)
 
 
-def do_cc(f):
+def process(f):
   al = addresslib.AddressLib.create_from_whois_files('whois/*')
 
   #format = r'%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"'
@@ -116,7 +116,7 @@ def do_cc(f):
     
     try:
       ip = None
-      ip, content_length, request_time = parse_self_log(line)
+      ip, content_length, request_time = parse_cc_log(line)
       seg = al.find(ip)
     except Exception,e:
       print >> sys.stderr, ip, line
@@ -144,7 +144,7 @@ def output(r, f):
     print >> f, "%s(%s) %d %d %d" % (i.key.name, addresslib.n2ip(i.key.start), i.count, i.average, i.pecent_90_average)
 
 if __name__ == '__main__':
-  ra = do_cc(open(sys.argv[1], 'r'))
+  ra = process(open(sys.argv[1], 'r'))
 
   try:
     os.mkdir(sys.argv[2])
