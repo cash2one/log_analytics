@@ -48,6 +48,18 @@ class Stat():
     x = heapq.nsmallest(n, self.samples)
     return float(sum(x)) / len(x)
 
+def parse_fast_log(line):
+  """
+  >>> parse_fast_log('111.77.98.150 - - [23/Jun/2013:00:00:00 +0800] "GET http://img.spriteapp.cn/f21/20130608/103315T1V31EEX.gif HTTP/1.1" 200 2036555 "-" "MyWeiboJingXuan/1.9.1 CFNetwork/609 Darwin/13.0.0" FCACHE_HIT_MEM  912.988 0.000 - - - - 0.000 2846.240 2846.240')
+  ('111.77.98.150', 2036555, 2846)
+  """
+  arr = [x for x in line.split(' ') if x]
+  ip = arr[0]
+  t = float(arr[-1])
+
+  content_length = int(arr[9])
+  return ip, content_length, int(t)
+
 def parse_cc_log(line):
   """
   >>> parse_cc_log('1370016000.000      1 58.253.216.21 TCP_HIT/200 61499 GET http://img.spriteapp.cn/ws/img/icon.jpg  - NONE/- image/jpeg "http://www.budejie.com/" "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.1 (KHTML, like Gecko) Maxthon/3.0 Chrome/22.0.1229.79 Safari/537.1" -')
@@ -116,7 +128,7 @@ def process(f):
     
     try:
       ip = None
-      ip, content_length, request_time = parse_cc_log(line)
+      ip, content_length, request_time = parse_fast_log(line)
       seg = al.find(ip)
     except Exception,e:
       print >> sys.stderr, ip, line
