@@ -145,9 +145,9 @@ def process(f):
     s = r.setdefault(seg, Stat(seg))
     s.add(request_time)
 
-    c = c + 1
-    if c > 10000000:
-      break
+    # c = c + 1
+    # if c > 10000000:
+    #   break
   return r0,r1,r2
 
 def output(r, f):
