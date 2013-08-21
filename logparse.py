@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf8 -*-
 
-import sys,re
+import sys,re, os
 import heapq
-#import apachelog
+import cStringIO
+
 import addresslib
+import text2table
 
 class Stat():
   """
@@ -60,6 +62,21 @@ def parse_fast_log(line):
   content_length = int(arr[9])
   return ip, content_length, int(t)
 
+def parse_ws_log(line):
+  """
+  >>> parse_ws_log('123.233.174.224 - - [16/Jul/2013:00:00:00 +0800]  19177 "GET http://img.spriteapp.cn/ugc/2013/07/06/51d7dc2e0838d.jpeg HTTP/1.1" 200 1610329 "-" "MyWeiboJingXuan/2.0.1 CFNetwork/609.1.4 Darwin/13.0.0"')
+  ('123.233.174.224', 1610329, 19177)
+  >>> parse_ws_log('112.226.122.249 - - [16/Jul/2013:00:00:00 +0800]  69 "GET http://img.spriteapp.cn/ugc/2013/07/06/51d839b6d97d6.jpeg HTTP/1.1" 200 603767 "-" "Apache-HttpClient/UNAVAILABLE (java 1.4)"')
+  ('112.226.122.249', 603767, 69)
+  """
+  arr = [x for x in line.split(' ') if x]
+  t, ip = arr[5],arr[0]
+  #if not t.isdigit():
+  #  return
+
+  content_length = int(arr[10])
+  return ip, content_length, int(t)
+
 def parse_cc_log(line):
   """
   >>> parse_cc_log('1370016000.000      1 58.253.216.21 TCP_HIT/200 61499 GET http://img.spriteapp.cn/ws/img/icon.jpg  - NONE/- image/jpeg "http://www.budejie.com/" "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.1 (KHTML, like Gecko) Maxthon/3.0 Chrome/22.0.1229.79 Safari/537.1" -')
@@ -109,16 +126,11 @@ def parse_self_log(line):
 def process(f):
   al = addresslib.AddressLib.create_from_whois_files('whois/*')
 
-  #format = r'%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"'
-  #p = apachelog.parser(format)
+  r0 = {} # < 50k
+  r1 = {} # 50-100k
+  r2 = {} # > 100k
 
-  # < 50k
-  # 50-100k
-  # > 100k
-
-  r0 = {}
-  r1 = {}
-  r2 = {}
+  region_map = {} # shandong => count, stat
   c = 0
   
   for line in f:
@@ -128,10 +140,11 @@ def process(f):
     
     try:
       ip = None
-      ip, content_length, request_time = parse_fast_log(line)
+      ip, content_length, request_time = parse_self_log(line)
       seg = al.find(ip)
     except Exception,e:
-      print >> sys.stderr, ip, line
+      #print >> sys.stderr, e, ip,seg
+      #raise
       continue
 
     #print ip, seg
@@ -145,34 +158,60 @@ def process(f):
     s = r.setdefault(seg, Stat(seg))
     s.add(request_time)
 
+    s = region_map.setdefault(seg.desc, Stat(seg))
+    s.add(request_time)
+
     # c = c + 1
-    # if c > 10000000:
+    # if c > 1000:
     #   break
-  return r0,r1,r2
+  return r0,r1,r2, region_map
 
 def output(r, f):
   sr = sorted(r, key = lambda x: x.count, reverse=True)
   for i in sr:
-    print >> f, "%s(%s) %d %d %d" % (i.key.name, addresslib.n2ip(i.key.start), i.count, i.average, i.pecent_90_average)
+    print >>f, "%s(%s) %d %d %d" % (i.key.name, addresslib.n2ip(i.key.start), i.count, i.average, i.pecent_90_average)
 
 if __name__ == '__main__':
-  ra = process(open(sys.argv[1], 'r'))
+  # arg1 log filename OR - for stdin
+  # arg2 folder for *.txt
 
   try:
     os.mkdir(sys.argv[2])
-  except:
+  except OSError,e: # OSError: [Errno 17] File exists
     pass
+
+  if sys.argv[1] == '-':
+    input = sys.stdin
+  else:
+    input = open(sys.argv[1], 'r')
+  ra = process(input)
+
+  cf = cStringIO.StringIO()
+  print >> cf, '网段 访问次数 平均 最快90%平均'
+  output(ra[0].values(), cf)
+  open('%s/less_than_50k.html' % sys.argv[2], 'w').write(text2table.convert(cf.getvalue()))
   
-  f = open('%s/less_than_50k.txt' % sys.argv[2], 'w')
-  print >> f, '网段 访问次数 平均 最快90%平均'
-  output(ra[0].values(), f)
 
-  f = open('%s/less_than_100k.txt' % sys.argv[2], 'w')
-  print >> f, '网段 访问次数 平均 最快90%平均'
-  output(ra[1].values(), f)
+  cf = cStringIO.StringIO()
+  print >> cf, '网段 访问次数 平均 最快90%平均'
+  output(ra[1].values(), cf)
+  open('%s/less_than_100k.html' % sys.argv[2], 'w').write(text2table.convert(cf.getvalue()))
 
-  f = open('%s/big_than_100k.txt' % sys.argv[2], 'w')
-  print >> f, '网段 访问次数 平均 最快90%平均'
-  output(ra[2].values(), f)
 
+  cf = cStringIO.StringIO()
+  print >> cf, '网段 访问次数 平均 最快90%平均'
+  output(ra[2].values(), cf)
+  open('%s/big_than_100k.html' % sys.argv[2], 'w').write(text2table.convert(cf.getvalue()))
+  
+
+  cf = cStringIO.StringIO()
+  print >> cf, '省 访问次数 平均 最快90%平均'
+  for key,value in ra[3].iteritems():
+    print >> cf, "%s %d %d %d" % (key, value.count, value.average, value.pecent_90_average)
+  open('%s/region.html' % sys.argv[2], 'w').write(text2table.convert(cf.getvalue()))
+
+  cf = cStringIO.StringIO()
+  for key,value in ra[3].iteritems():
+    print >> cf, "%s %d %d %d" % (key, value.count, value.average, value.pecent_90_average)
+  open('%s/region.txt' % sys.argv[2], 'w').write(cf.getvalue())
 

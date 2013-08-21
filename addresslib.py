@@ -76,8 +76,67 @@ class Item:
     return self.start
 
   def __repr__(self):
-    return "%s(%s - %s %s)" % (self.__class__, n2ip(self.start), n2ip(self.end), self.name)
+    return "%s(%s - %s %s in %s)" % (self.__class__, n2ip(self.start), n2ip(self.end), self.name, self.desc)
 
+def find_province(c):
+  """
+  >>> find_province("address:        Shang Di East ROAD,Hai Dian District Beijing,P.R.China")
+  'beijing'
+  TODO: use descr section (not address)
+  """
+  name_set = ('beijing',
+    'tianjin',
+    'hebei',
+    'shanxi',
+    'liaoning',
+    'neimenggu',
+    'jilin',
+    'heilongjiang',
+    'shanghai',
+    'jiangsu',
+    'zhejiang',
+    'anhui',
+    'fujian',
+    'jiangxi',
+    'shandong',
+    'henan',
+    'hubei',
+    'hunan',
+    'guangdong',
+    'guangxi',
+    'hainan',
+    'chongqing',
+    'sichuan',
+    'guizhou',
+    'yunnan',
+    'tibet',
+    'shaanxi',
+    'gansu',
+    'qinghai',
+    'ningxia',
+    'xinjiang',
+    'hongkong',
+    'macau',
+    'taiwan')
+  lc = c.lower()
+  for i in name_set:
+    if i in lc:
+      return i
+
+def parse_whois(c):
+  """
+  >>> c = open("whois/58.83.0.0", 'rb').read()
+  >>> parse_whois(c)
+  (978518016, 978583551, 'CenturyNetwork', 'beijing')
+  """
+  s = mid(c, "inetnum:", '\n').strip()
+  start,end = s.split('-')
+  start = ip2n(start.strip())
+  end = ip2n(end.strip())
+  # netname:        CHINANET-HB
+  name = mid(c, 'netname:', '\n').strip()
+  province = find_province(c)
+  return start, end, name, province
 
 class AddressLib():
   def find(self, ip):
@@ -93,29 +152,23 @@ class AddressLib():
     self.seq = a
 
   @staticmethod
-  def parse_whois(c):
-    # inetnum:        27.16.0.0 - 27.31.255.255
-    s = mid(c, "inetnum:", '\n').strip()
-    start,end = s.split('-')
-    start = ip2n(start.strip())
-    end = ip2n(end.strip())
-    # netname:        CHINANET-HB
-    name = mid(c, 'netname:', '\n').strip()
-    return start, end, name
-
-  @staticmethod
   def create_from_whois_files(pat):
     import glob
     col = set()
 
+    file_count = 0
+
     for f in glob.glob(pat):
+      #file_count += 1
+      #if file_count > 100:
+      #  break
       c = open(f, 'r').read()
       try:
-        start, end, name = AddressLib.parse_whois(c)
+        start, end, name, province = parse_whois(c)
       except:
         print 'file %s parse failed\n' % f
         continue
-      item = Item(start, end, name)
+      item = Item(start, end, name, province)
       col.add(item)
 
     return AddressLib(sorted([i for i in col]))
@@ -127,3 +180,6 @@ if __name__ == '__main__':
   lib = AddressLib.create_from_whois_files('whois/*')
   for i in ['1.204.0.1', '1.10.0.1']:
     print i, lib.find(i)
+
+
+
