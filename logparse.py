@@ -158,7 +158,7 @@ def process(f):
     s = r.setdefault(seg, Stat(seg))
     s.add(request_time)
 
-    s = region_map.setdefault(seg.desc, Stat(seg))
+    s = region_map.setdefault(seg.desc, Stat(seg.desc))
     s.add(request_time)
 
     # c = c + 1

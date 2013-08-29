@@ -84,8 +84,7 @@ def find_province(c):
   'beijing'
   TODO: use descr section (not address)
   """
-  name_set = ('beijing',
-    'tianjin',
+  name_set = ('tianjin',
     'hebei',
     'shanxi',
     'liaoning',
@@ -116,16 +115,34 @@ def find_province(c):
     'ningxia',
     'xinjiang',
     'hongkong',
+    'beijing',
     'macau',
+    'telecom',
+    'jingrong street',
+    'unicom',
+    'university',
     'taiwan')
   lc = c.lower()
-  for i in name_set:
-    if i in lc:
-      return i
+  lines = lc.split('\n')
+  for line in lines:
+    if line.find('descr:') == 0: 
+      for i in name_set:
+        if i in line:
+          return i
+  for line in lines:
+    if line.find('addr:') == 0: 
+      for i in name_set:
+        if i in line:
+          return i + '_'
+  print foo
+  return 'none'
 
 def parse_whois(c):
   """
   >>> c = open("whois/58.83.0.0", 'rb').read()
+  >>> parse_whois(c)
+  (978518016, 978583551, 'CenturyNetwork', 'beijing')
+  >>> c = open("whois/59.44.0.0", 'rb').read()
   >>> parse_whois(c)
   (978518016, 978583551, 'CenturyNetwork', 'beijing')
   """
@@ -173,11 +190,26 @@ class AddressLib():
 
     return AddressLib(sorted([i for i in col]))
 
+  @staticmethod
+  def create_from_iplib():
+    fn = "iplib.txt"
+
+    col = set()
+    for line in open(fn, 'rb'):
+      line = line.strip('\n\r')
+      start, end, district = line.split(',')
+
+      item = Item(ip2n(start), ip2n(end), '', district)
+      col.add(item)
+    return AddressLib(sorted(col))
+
+
   def __repr__(self):
     return "%s(%r)" % (self.__class__, self.__dict__)
 
 if __name__ == '__main__':
   lib = AddressLib.create_from_whois_files('whois/*')
+  # lib = AddressLib.create_from_iplib()
   for i in ['1.204.0.1', '1.10.0.1']:
     print i, lib.find(i)
 
