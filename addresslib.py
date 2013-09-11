@@ -3,6 +3,8 @@
 import os,sys,json,socket,struct
 import bisect
 
+import time
+
 def ip2n(s):
   """
   >>> ip2n('0.0.0.0')
@@ -134,7 +136,7 @@ def find_province(c):
       for i in name_set:
         if i in line:
           return i + '_'
-  print foo
+  
   return 'none'
 
 def parse_whois(c):
@@ -161,8 +163,13 @@ class AddressLib():
       ip = ip2n(ip)
 
     i = bisect.bisect_left(self.seq, Item(ip,ip))
-    assert i, ip
-    return self.seq[i - 1]
+    # assert i, ip
+    # print 'find:', i, n2ip(ip), self.seq[i-1], self.seq[i], self.seq[i+1]
+    a = self.seq[i]
+    if ip >= a.start:
+      return self.seq[i]
+    else:
+      return self.seq[i-1]
 
   def __init__(self, a):
     assert(isinstance(a, list))
@@ -191,15 +198,16 @@ class AddressLib():
     return AddressLib(sorted([i for i in col]))
 
   @staticmethod
-  def create_from_iplib():
-    fn = "iplib.txt"
+  def create_from_iplib(fn = None):
+    if fn is None:
+      fn = "iplib.txt"
 
     col = set()
     for line in open(fn, 'rb'):
       line = line.strip('\n\r')
       start, end, district = line.split(',')
 
-      item = Item(ip2n(start), ip2n(end), '', district)
+      item = Item(ip2n(start), ip2n(end), district, district)
       col.add(item)
     return AddressLib(sorted(col))
 
@@ -208,10 +216,16 @@ class AddressLib():
     return "%s(%r)" % (self.__class__, self.__dict__)
 
 if __name__ == '__main__':
-  lib = AddressLib.create_from_whois_files('whois/*')
-  # lib = AddressLib.create_from_iplib()
-  for i in ['1.204.0.1', '1.10.0.1']:
-    print i, lib.find(i)
+  if False:
+    lib = AddressLib.create_from_whois_files('whois/*')
+  else:
+    lib = AddressLib.create_from_iplib('iplib.txt')
+
+  start = time.time()
+  for i in ['222.240.144.143', '222.240.144.144', '1.204.0.1', '1.10.0.1']:
+    print '[%.4f]' % (time.time() - start), i, lib.find(i),
+    print 
+
 
 
 
